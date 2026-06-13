@@ -1,12 +1,16 @@
 FROM dunglas/frankenphp:php8.2-bookworm
 
-# Install system packages
+# System packages
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
     zip \
+    curl \
     libatomic1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Install PHP extensions
 RUN install-php-extensions \
@@ -14,39 +18,24 @@ RUN install-php-extensions \
     pdo_mysql \
     redis \
     mbstring \
-    bcmath \
-    exif \
-    gd \
-    intl \
     zip \
     opcache
 
 WORKDIR /app
 
-# Copy composer files first for better caching
-COPY composer.json composer.lock ./
-
-# Install Composer dependencies
-RUN composer install \
-    --no-dev \
-    --optimize-autoloader \
-    --no-interaction \
-    --prefer-dist
-
 # Copy application files
 COPY . .
+
+# Install PHP dependencies
+RUN composer install --no-dev --optimize-autoloader
 
 # Install Node.js
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs
 
-# Build frontend assets
+# Build frontend
 RUN npm install
 RUN npm run build
-
-# Storage permissions
-RUN mkdir -p storage/logs bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
 
 # Startup script
 COPY docker-start.sh /usr/local/bin/docker-start.sh
